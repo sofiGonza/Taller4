@@ -10,13 +10,13 @@ services:
   - type: web
     name: taller4-api
     runtime: docker
-    rootDir: backend
     plan: free
     region: oregon
     dockerfilePath: backend/Dockerfile
-    # Contexto de build de Docker: la carpeta backend (ahí viven
-    # requirements.txt y el código). Sin esto Render usaría la raíz del
-    # repo y el COPY requirements.txt fallaría.
+    # Contexto de build: la carpeta backend (ahí viven requirements.txt y el
+    # código). Ambos campos son relativos a la RAÍZ del repo; si se combina
+    # con rootDir, Render los resuelve anidados (backend/backend) y el build
+    # falla, por eso no se usa rootDir aquí.
     dockerContext: backend
     healthCheckPath: /
     autoDeploy: true
