@@ -1,0 +1,42 @@
+# Render Blueprint para el backend FastAPI (Taller4)
+# Uso: en Render, "New +" -> "Blueprint" -> elegir este repositorio.
+# Render encontrará este archivo y creará el Web Service con la configuración
+# de abajo. Las variables marcadas con `sync: false` NO se leen del repo:
+# se piden una única vez al crearlo (escríbelas en el dashboard).
+#
+# Importante: se instalan las librerías de sistema que OpenCV necesita en
+# runtime (libglib, libSM, libGL), porque la imagen base de Python de Render
+# no las incluye y sin ellas cv2 falla al importarse.
+
+services:
+  - type: web
+    name: taller4-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    region: oregon
+    buildCommand: |
+      apt-get update -y && apt-get install -y --no-install-recommends libglib2.0-0 libsm6 libgl1 && rm -rf /var/lib/apt/lists/*
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      # Estas se piden al crear el servicio (no se comprometen en git).
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      # Con valores por defecto seguros para producción.
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 60
+      - key: LBPH_CONFIDENCE_THRESHOLD
+        value: "60"
+      - key: MIN_FACE_SAMPLES
+        value: "3"
+      # Orígenes permitidos (CORS). El frontend Django llama al backend desde
+      # el servidor (requests), así que no depende del CORS del navegador;
+      # se dejan ambos por si se consume la API directamente desde Swagger/JS.
+      - key: ALLOWED_ORIGINS
+        value: https://<TU-FRONTEND>.vercel.app,http://localhost:8000,http://127.0.0.1:8000

@@ -26,6 +26,13 @@ if os.getenv("VERCEL_URL"):
     ALLOWED_HOSTS.append(os.getenv("VERCEL_URL"))
     CSRF_TRUSTED_ORIGINS = [f"https://{os.getenv('VERCEL_URL')}"]
 
+# Seguridad en producción: detrás del proxy HTTPS de Vercel/Render.
+if os.getenv("DJANGO_DEBUG", "True") != "True":
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = False  # Vercel ya termina TLS; no redirigir en la app
+
 
 # Application definition
 
@@ -73,15 +80,20 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 
 # Database
-# SQLite por defecto. En Vercel el filesystem es de solo lectura salvo /tmp,
-# así que en producción serverless conviene usar DATABASE_URL con una BD
-# externa (Postgres, etc.). Aquí solo se guarda info de sesión de Django
-# (usuarios), no los datos biométricos, que viven en el backend FastAPI.
+# - En producción (Vercel) el filesystem de la función serverless es de solo
+#   lectura salvo /tmp y cada invocación puede correr en una instancia nueva,
+#   por lo que SQLite no persiste. Se usa DATABASE_URL apuntando a un Postgres
+#   externo (Neon, Supabase, Vercel Postgres...).
+# - En desarrollo local sin DATABASE_URL se cae de vuelta a SQLite (cómodo).
+import dj_database_url  # type: ignore
+
+_DEFAULT_SQLITE_URL = "sqlite:///" + str(BASE_DIR / "db.sqlite3").replace("\\", "/")
+
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.getenv("DJANGO_DB_PATH", BASE_DIR / "db.sqlite3"),
-    }
+    "default": dj_database_url.config(
+        default=os.getenv("DJANGO_DB_PATH", _DEFAULT_SQLITE_URL),
+        conn_max_age=600,
+    )
 }
 
 
