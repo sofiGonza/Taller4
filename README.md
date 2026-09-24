@@ -15,6 +15,14 @@ fastapi_taller4/
 └── frontend/    # Sitio Django (vistas, plantillas, JS de cámara)
 ```
 
+## Enlaces del proyecto (producción)
+
+| Aplicación | URL |
+|---|---|
+| **Frontend (Sitio Django · Vercel)** | https://taller4-jtnw.vercel.app/ |
+| **Backend (API FastAPI · Render)** | https://taller4-api.onrender.com |
+| Swagger del backend (/docs) | https://taller4-api.onrender.com/docs |
+
 ## Cómo funciona el reconocimiento facial
 
 Se usa OpenCV en vez de librerías basadas en `dlib` (como `face_recognition`)
@@ -69,11 +77,7 @@ python manage.py runserver 8000
 
 - Sitio: http://127.0.0.1:8000
 - Flujo: `Registrarse` → `Iniciar sesión` → página de captura de cámara con
-  botones **"Registrar mi rostro"** y **"Reconocer rostro"`.
-
-> Importante: levanta primero el backend (puerto 8001) y luego el frontend
-> (puerto 8000); el registro y el login de Django llaman al backend para
-> crear el usuario también en la API y obtener su JWT.
+  botones **"Registrar mi rostro"** y **"Reconocer rostro"**.
 
 ## 3. Autenticación
 
@@ -96,22 +100,21 @@ El backend (FastAPI) se despliega en **Render** y el frontend (Django) en
 
 1. Sube el repo a GitHub (ya está en `sofiGonza/Taller4`).
 2. En Render: **New + → Blueprint** y elige el repositorio. Render leerá
-   `backend/render.yaml` y creará el Web Service con:
-   - `rootDir: backend`
-   - Instalación de las librerías de sistema que OpenCV necesita
-     (`libglib2.0-0 libsm6 libgl1`) en el build
-   - `startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT`
+   `render.yaml` (en la raíz) y creará el Web Service con:
+   - `runtime: docker` y `dockerfilePath: backend/Dockerfile`
+     (`python:3.12-slim`, libs de OpenCV instaladas en la imagen)
+   - `startCommand`/CMD: `uvicorn main:app --host 0.0.0.0 --port $PORT`
    - Healthcheck en `/`
 3. Al crearlo, Render te pedirá (variables con `sync: false`):
    - `SECRET_KEY` — clave aleatoria larga
    - `DATABASE_URL` — opcional; por defecto usa SQLite en el disco de Render
      (efímero; ver limitaciones abajo)
-4. URL resultante, p.ej. `https://taller4-api.onrender.com`. Verifica
-   `https://<url>/docs`.
+4. URL resultante: **https://taller4-api.onrender.com** (verifica
+   `https://taller4-api.onrender.com/docs`).
 
 > Si prefieres crear el Web Service a mano (sin Blueprint), usa los mismos
-> valores: runtime Python, `rootDir backend`, el build y start de arriba, y
-> las mismas variables de entorno.
+> valores: runtime Docker, `dockerfilePath backend/Dockerfile`, `dockerContext
+> backend` y las mismas variables de entorno.
 
 ### Postgres externo (para el frontend)
 
@@ -132,8 +135,8 @@ Postgres gratuito (Neon, Supabase o Vercel Postgres) y copia su
 3. Variables de entorno (Project Settings → Environment Variables):
    - `DJANGO_SECRET_KEY` — clave aleatoria larga
    - `DJANGO_DEBUG=False`
-   - `DJANGO_ALLOWED_HOSTS=<tu-dominio>.vercel.app,.vercel.app`
-   - `FASTAPI_BASE_URL=https://<tu-backend>.onrender.com` — la URL pública del
+   - `DJANGO_ALLOWED_HOSTS=taller4-jtnw.vercel.app,.vercel.app`
+   - `FASTAPI_BASE_URL=https://taller4-api.onrender.com` — la URL pública del
      backend de Render
    - `DATABASE_URL=postgresql://…` — el Postgres del paso anterior
 4. Deploy. Verifica el sitio y el flujo completo (registro → login → cámara).
@@ -164,12 +167,6 @@ servidor FastAPI real y el test client de Django:
 - Manejo de errores: imagen sin rostro (`422`), sin coincidencia registrada,
   backend no disponible.
 
-## Próximos pasos sugeridos
-
-- Agregar límite de intentos / rate limiting al login y al reconocimiento.
-- Servir los archivos de datos biométricos desde un storage externo antes de
-  desplegar a producción.
-- Agregar tests automatizados (`pytest` para el backend, `pytest-django` o
-  `unittest` para el frontend).
-- Mostrar en la interfaz un recuadro sobre el rostro detectado (dibujando el
-  bounding box que ya calcula `face_service.extract_face`).
+En producción (2026-09-24) se verificó que ambos servicios responden:
+`https://taller4-jtnw.vercel.app/accounts/login/` (200) y
+`https://taller4-api.onrender.com/` + `/docs` (200).
