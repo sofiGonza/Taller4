@@ -23,6 +23,10 @@ services:
     healthCheckPath: /
     autoDeploy: true
     envVars:
+      # Fija la versión de Python (3.12, la usada en desarrollo). Render usa
+      # Nixpacks, que respeta esta variable para elegir el runtime.
+      - key: NIXPACKS_PYTHON_VERSION
+        value: "3.12"
       # Estas se piden al crear el servicio (no se comprometen en git).
       - key: SECRET_KEY
         sync: false
