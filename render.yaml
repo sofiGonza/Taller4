@@ -1,32 +1,26 @@
 # Render Blueprint para el backend FastAPI (Taller4)
 # Uso: en Render, "New +" -> "Blueprint" -> elegir este repositorio.
-# Render encontrará este archivo y creará el Web Service con la configuración
-# de abajo. Las variables marcadas con `sync: false` NO se leen del repo:
-# se piden una única vez al crearlo (escríbelas en el dashboard).
 #
-# Importante: se instalan las librerías de sistema que OpenCV necesita en
-# runtime (libglib, libSM, libGL), porque la imagen base de Python de Render
-# no las incluye y sin ellas cv2 falla al importarse.
+# Se usa Docker (en vez del build nativo de Python) porque el sandbox nativo
+# de Render tiene el filesystem en solo lectura: apt-get falla y no hay wheels
+# para pydantic-core en Python 3.14 (que es el que Render eligió por defecto).
+# El Dockerfile usa python:3.12-slim e instala las libs de OpenCV en la imagen.
 
 services:
   - type: web
     name: taller4-api
-    runtime: python
+    runtime: docker
     rootDir: backend
     plan: free
     region: oregon
-    buildCommand: |
-      apt-get update -y && apt-get install -y --no-install-recommends libglib2.0-0 libsm6 libgl1 && rm -rf /var/lib/apt/lists/*
-      pip install --upgrade pip
-      pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: backend/Dockerfile
+    # Contexto de build de Docker: la carpeta backend (ahí viven
+    # requirements.txt y el código). Sin esto Render usaría la raíz del
+    # repo y el COPY requirements.txt fallaría.
+    dockerContext: backend
     healthCheckPath: /
     autoDeploy: true
     envVars:
-      # Fija la versión de Python (3.12, la usada en desarrollo). Render usa
-      # Nixpacks, que respeta esta variable para elegir el runtime.
-      - key: NIXPACKS_PYTHON_VERSION
-        value: "3.12"
       # Estas se piden al crear el servicio (no se comprometen en git).
       - key: SECRET_KEY
         sync: false
