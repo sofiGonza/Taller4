@@ -9,19 +9,61 @@ Proyecto compuesto por dos aplicaciones independientes que se comunican por HTTP
   captura video de la cámara del usuario (`getUserMedia`), lo envía al backend y
   muestra el resultado.
 
+## Estructura del proyecto
+
 ```
 fastapi_taller4/
-├── backend/     # API FastAPI (Python, Pydantic, OpenCV, JWT)
-└── frontend/    # Sitio Django (vistas, plantillas, JS de cámara)
+├── render.yaml                      # Blueprint de Render (raíz del repo)
+├── README.md
+├── backend/                         # API FastAPI (Python, Pydantic, OpenCV, JWT)
+│   ├── Dockerfile                   # Imagen python:3.12-slim + libs de OpenCV
+│   ├── requirements.txt
+│   ├── main.py                      # App FastAPI, CORS y healthcheck (/)
+│   ├── config.py                    # Configuración central (variables de entorno)
+│   ├── database.py                  # Motor y sesión de SQLAlchemy
+│   ├── models_db.py                 # Modelos de la base de datos
+│   ├── schemas.py                   # Schemas Pydantic
+│   ├── deps.py                      # Dependencias (usuario autenticado por JWT)
+│   ├── security.py                  # Hash y verificación de contraseñas
+│   ├── face_service.py              # Detección Haar Cascade + reconocimiento LBPH
+│   ├── routers/
+│   │   ├── auth.py                  # POST /auth/register · /auth/login · GET /auth/me
+│   │   └── face.py                  # POST /face/register · /face/recognize
+│   ├── data/faces/                  # Fotos de referencia (efímeras en Render free)
+│   ├── models_store/                # Modelo LBPH entrenado (efímero)
+│   ├── api/index.py                 # Entrypoint legacy para Vercel (no usado con Docker)
+│   ├── runtime.txt                  # Fija Python 3.12
+│   └── .env.example
+└── frontend/                        # Sitio Django (vistas, plantillas, JS de cámara)
+    ├── manage.py
+    ├── requirements.txt
+    ├── vercel.json                  # Despliegue en Vercel (WSGI + collectstatic)
+    ├── api/index.py                 # Entrypoint WSGI para Vercel
+    ├── config/
+    │   ├── settings.py              # Configuración Django (Postgres vía DATABASE_URL)
+    │   ├── urls.py
+    │   ├── asgi.py
+    │   └── wsgi.py
+    ├── accounts/                    # Registro y login (Django + sincronización FastAPI)
+    │   ├── views.py · services.py · forms.py · urls.py
+    │   └── templates/accounts/
+    ├── capture/                     # Captura de cámara y verificación facial
+    │   ├── views.py · services.py · urls.py
+    │   ├── static/capture/js/camera.js
+    │   └── templates/capture/
+    ├── templates/base.html
+    ├── static/css/main.css
+    ├── staticfiles/                 # Estáticos recolectados (whitenoise, versionados)
+    └── .env.example
 ```
 
 ## Enlaces del proyecto (producción)
 
 | Aplicación | URL |
 |---|---|
-| **Frontend (Sitio Django · Vercel)** | https://taller4-jtnw.vercel.app/ |
-| **Backend (API FastAPI · Render)** | https://taller4-api.onrender.com |
-| Swagger del backend (/docs) | https://taller4-api.onrender.com/docs |
+| **Frontend** (Sitio Django · Vercel) | https://taller4-jtnw.vercel.app/ |
+| **Backend** (API FastAPI · Render) | https://taller4-api.onrender.com |
+| Swagger del backend (`/docs`) | https://taller4-api.onrender.com/docs |
 
 ## Cómo funciona el reconocimiento facial
 
@@ -39,7 +81,7 @@ reconocimiento facial, no una simulación:
 3. **Reconocimiento**: al capturar una nueva foto (`POST /face/recognize`), se
    detecta el rostro y se compara contra el modelo entrenado. Si la distancia
    (confianza) es menor al umbral configurado (`LBPH_CONFIDENCE_THRESHOLD`,
-   por defecto 80), se considera una coincidencia.
+   por defecto 60), se considera una coincidencia.
 
 Se recomienda registrar 3-5 fotos por usuario (distintos ángulos/gestos) para
 mejorar la precisión.
@@ -93,80 +135,26 @@ cualquier otro cliente (una app móvil, Swagger, etc.) sin depender de Django.
 
 ## 4. Despliegue
 
-El backend (FastAPI) se despliega en **Render** y el frontend (Django) en
-**Vercel**, cada uno como proyecto independiente.
+El proyecto está desplegado en producción:
 
-### Backend → Render (Web Service)
+| Aplicación | URL | Plataforma |
+|---|---|---|
+| **Frontend** (Django) | https://taller4-jtnw.vercel.app/ | Vercel |
+| **Backend** (API FastAPI) | https://taller4-api.onrender.com | Render |
+| Swagger del backend (`/docs`) | https://taller4-api.onrender.com/docs | Render |
 
-1. Sube el repo a GitHub (ya está en `sofiGonza/Taller4`).
-2. En Render: **New + → Blueprint** y elige el repositorio. Render leerá
-   `render.yaml` (en la raíz) y creará el Web Service con:
-   - `runtime: docker` y `dockerfilePath: backend/Dockerfile`
-     (`python:3.12-slim`, libs de OpenCV instaladas en la imagen)
-   - `startCommand`/CMD: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-   - Healthcheck en `/`
-3. Al crearlo, Render te pedirá (variables con `sync: false`):
-   - `SECRET_KEY` — clave aleatoria larga
-   - `DATABASE_URL` — opcional; por defecto usa SQLite en el disco de Render
-     (efímero; ver limitaciones abajo)
-4. URL resultante: **https://taller4-api.onrender.com** (verifica
-   `https://taller4-api.onrender.com/docs`).
-
-> Si prefieres crear el Web Service a mano (sin Blueprint), usa los mismos
-> valores: runtime Docker, `dockerfilePath backend/Dockerfile`, `dockerContext
-> backend` y las mismas variables de entorno.
-
-### Postgres externo (para el frontend)
-
-El frontend Django necesita una base de datos persistente; en Vercel
-(serverless) el filesystem es de solo lectura y SQLite no funciona. Crea un
-Postgres gratuito (Neon, Supabase o Vercel Postgres) y copia su
-`DATABASE_URL` (formato `postgresql://…`).
-
-### Frontend → Vercel
-
-1. En Vercel: **Add New → Project → Importar el repo de GitHub**.
-2. Configura el proyecto:
-   - **Root Directory:** `frontend`
-   - **Framework Preset:** Other (Python/WSGI)
-   - Vercel usará `vercel.json` (runtime `@vercel/python`, entrada
-     `api/index.py` como WSGI, y build que ejecuta `collectstatic` para
-     servir los estáticos con whitenoise).
-3. Variables de entorno (Project Settings → Environment Variables):
-   - `DJANGO_SECRET_KEY` — clave aleatoria larga
-   - `DJANGO_DEBUG=False`
-   - `DJANGO_ALLOWED_HOSTS=taller4-jtnw.vercel.app,.vercel.app`
-   - `FASTAPI_BASE_URL=https://taller4-api.onrender.com` — la URL pública del
-     backend de Render
-   - `DATABASE_URL=postgresql://…` — el Postgres del paso anterior
-4. Deploy. Verifica el sitio y el flujo completo (registro → login → cámara).
-
-### Limitaciones (plan gratuito)
-
-- **Render free** duerme la instancia tras ~15 minutos sin tráfico; el primer
-  request tras dormir tarda unos segundos en responder (y OpenCV pesa al
-  importar).
-- El disco de Render es **efímero**: las fotos de referencia y el modelo LBPH
-  (carpetas `data/` y `models_store/`) se guardan en el filesystem local, así
-  que **se pierden si Render recicla la instancia**. La BD del backend (SQLite
-  por defecto) sufre lo mismo, por lo que el sistema vuelve a un estado
-  consistente: hay que re-registrar usuarios y sus rostros. Es aceptable para
-  un taller/demo; para producción real conviene:
-  - mover la BD del backend a un Postgres externo vía `DATABASE_URL`, y
-  - subir las muestras de rostro y el modelo entrenado a un storage externo
-    (S3, Vercel Blob, etc.) en lugar del filesystem local.
+- El **backend** corre en Render con Docker (`python:3.12-slim`, libs de OpenCV
+  instaladas en la imagen; config en `render.yaml` + `backend/Dockerfile`).
+- El **frontend** corre en Vercel (WSGI vía `frontend/api/index.py` + whitenoise
+  para los estáticos) y usa un **Postgres externo** (Neon) para persistir
+  usuarios y sesiones de Django.
+- Nota (plan gratuito): Render duerme la instancia tras ~15 min sin tráfico
+  (primer request lento) y su disco es efímero: fotos de rostro y modelo LBPH
+  se pierden si la instancia se recicla. Aceptable para demo.
 
 ## 5. Pruebas realizadas
 
-Antes de entregar este esqueleto se verificó, de punta a punta, con un
-servidor FastAPI real y el test client de Django:
-
-- Registro e inicio de sesión (Django + FastAPI sincronizados, JWT emitido).
-- Registro de una foto de referencia con detección de rostro real (OpenCV).
-- Reconocimiento facial exitoso contra el usuario registrado.
-- Manejo de errores: imagen sin rostro (`422`), sin coincidencia registrada,
-  backend no disponible.
-
-En producción (2026-09-24) se verificó que ambos servicios responden:
-`https://taller4-jtnw.vercel.app/accounts/login/` (200) y
-`https://taller4-api.onrender.com/` + `/docs` (200).
+Registro e inicio de sesión (Django + FastAPI sincronizados, JWT emitido),
+registro de una foto de referencia con detección de rostro real (OpenCV),
+reconocimiento facial exitoso, y manejo de errores (imagen sin rostro, sin
+coincidencia registrada, backend no disponible).
