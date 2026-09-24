@@ -87,43 +87,71 @@ python manage.py runserver 8000
 Ambos sistemas están desacoplados a propósito: la API puede consumirse desde
 cualquier otro cliente (una app móvil, Swagger, etc.) sin depender de Django.
 
-## 4. Despliegue en Vercel
+## 4. Despliegue
 
-Cada aplicación se despliega como un **proyecto de Vercel independiente**
-(dos proyectos, dos dominios), cada uno con su propio `vercel.json`:
+El backend (FastAPI) se despliega en **Render** y el frontend (Django) en
+**Vercel**, cada uno como proyecto independiente.
 
-### Backend
-```bash
-cd backend
-vercel --prod
-```
-Configura en el dashboard de Vercel las variables de entorno de `.env.example`
-(`SECRET_KEY`, `DATABASE_URL`, etc.).
+### Backend → Render (Web Service)
 
-**Limitaciones a tener en cuenta:**
-- El filesystem de una función serverless es de solo lectura salvo `/tmp`, y
-  cada invocación puede correr en una instancia distinta. Esto significa que
-  las fotos de referencia y el modelo LBPH entrenado (carpetas `data/` y
-  `models_store/`) **no persisten de forma confiable entre invocaciones** en
-  producción. Para un despliegue real conviene:
-  - mover la base de datos a un servicio externo (Postgres, Turso, etc.) vía `DATABASE_URL`, y
+1. Sube el repo a GitHub (ya está en `sofiGonza/Taller4`).
+2. En Render: **New + → Blueprint** y elige el repositorio. Render leerá
+   `backend/render.yaml` y creará el Web Service con:
+   - `rootDir: backend`
+   - Instalación de las librerías de sistema que OpenCV necesita
+     (`libglib2.0-0 libsm6 libgl1`) en el build
+   - `startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - Healthcheck en `/`
+3. Al crearlo, Render te pedirá (variables con `sync: false`):
+   - `SECRET_KEY` — clave aleatoria larga
+   - `DATABASE_URL` — opcional; por defecto usa SQLite en el disco de Render
+     (efímero; ver limitaciones abajo)
+4. URL resultante, p.ej. `https://taller4-api.onrender.com`. Verifica
+   `https://<url>/docs`.
+
+> Si prefieres crear el Web Service a mano (sin Blueprint), usa los mismos
+> valores: runtime Python, `rootDir backend`, el build y start de arriba, y
+> las mismas variables de entorno.
+
+### Postgres externo (para el frontend)
+
+El frontend Django necesita una base de datos persistente; en Vercel
+(serverless) el filesystem es de solo lectura y SQLite no funciona. Crea un
+Postgres gratuito (Neon, Supabase o Vercel Postgres) y copia su
+`DATABASE_URL` (formato `postgresql://…`).
+
+### Frontend → Vercel
+
+1. En Vercel: **Add New → Project → Importar el repo de GitHub**.
+2. Configura el proyecto:
+   - **Root Directory:** `frontend`
+   - **Framework Preset:** Other (Python/WSGI)
+   - Vercel usará `vercel.json` (runtime `@vercel/python`, entrada
+     `api/index.py` como WSGI, y build que ejecuta `collectstatic` para
+     servir los estáticos con whitenoise).
+3. Variables de entorno (Project Settings → Environment Variables):
+   - `DJANGO_SECRET_KEY` — clave aleatoria larga
+   - `DJANGO_DEBUG=False`
+   - `DJANGO_ALLOWED_HOSTS=<tu-dominio>.vercel.app,.vercel.app`
+   - `FASTAPI_BASE_URL=https://<tu-backend>.onrender.com` — la URL pública del
+     backend de Render
+   - `DATABASE_URL=postgresql://…` — el Postgres del paso anterior
+4. Deploy. Verifica el sitio y el flujo completo (registro → login → cámara).
+
+### Limitaciones (plan gratuito)
+
+- **Render free** duerme la instancia tras ~15 minutos sin tráfico; el primer
+  request tras dormir tarda unos segundos en responder (y OpenCV pesa al
+  importar).
+- El disco de Render es **efímero**: las fotos de referencia y el modelo LBPH
+  (carpetas `data/` y `models_store/`) se guardan en el filesystem local, así
+  que **se pierden si Render recicla la instancia**. La BD del backend (SQLite
+  por defecto) sufre lo mismo, por lo que el sistema vuelve a un estado
+  consistente: hay que re-registrar usuarios y sus rostros. Es aceptable para
+  un taller/demo; para producción real conviene:
+  - mover la BD del backend a un Postgres externo vía `DATABASE_URL`, y
   - subir las muestras de rostro y el modelo entrenado a un storage externo
     (S3, Vercel Blob, etc.) en lugar del filesystem local.
-  - Alternativamente, desplegar el backend en un servicio con filesystem
-    persistente (Render, Railway, un VPS) y dejar solo el frontend en Vercel.
-- El paquete `opencv-contrib-python-headless` es voluminoso; si el tamaño del
-  build supera el límite de Vercel, considera separar el backend a otro
-  proveedor.
-
-### Frontend
-```bash
-cd frontend
-python manage.py collectstatic --noinput   # genera staticfiles/ (servido por whitenoise)
-vercel --prod
-```
-Configura `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=False`, `DJANGO_ALLOWED_HOSTS` y,
-sobre todo, `FASTAPI_BASE_URL` apuntando a la URL pública del backend ya
-desplegado.
 
 ## 5. Pruebas realizadas
 
