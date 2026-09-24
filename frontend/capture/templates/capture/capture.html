@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Verificación facial · FaceAuth{% endblock %}
+{% block card_class %} wide{% endblock %}
+
+{% block content %}
+  <p class="eyebrow">Sesión activa</p>
+  <h1>Verificación facial</h1>
+  <p class="subtitle">
+    Encuadra tu rostro dentro del marco y usa los controles para registrar tu
+    rostro de referencia o verificar tu identidad.
+  </p>
+
+  {% if not has_token %}
+    <div class="status-badge warning" style="margin-bottom: 1.25rem;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>
+        No se pudo autenticar con el servicio de reconocimiento facial en este
+        inicio de sesión. El registro de rostro no estará disponible hasta
+        que vuelvas a iniciar sesión (o el backend esté disponible).
+      </span>
+    </div>
+  {% endif %}
+
+  <div class="scan-stage">
+    <div class="scan-radar" id="scan-radar">
+      <div class="scan-frame" id="scan-frame">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas" width="360" height="270" style="display:none;"></canvas>
+        <div class="radar-sweep"></div>
+      </div>
+      <div class="scan-ring"></div>
+      <div class="pulse-ring"></div>
+      <div class="pulse-ring delay"></div>
+    </div>
+
+    <div class="live-dot"><span class="dot"></span>CÁMARA EN VIVO</div>
+
+    <div class="btn-row" style="width: 100%; max-width: 340px;">
+      {% if face_registered %}
+        <span class="face-registered-badge" style="flex: 1; justify-content: center;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 13 4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Rostro ya registrado
+        </span>
+      {% else %}
+        <button id="btn-register" class="btn btn-outline" {% if not has_token %}disabled{% endif %}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V7a2 2 0 0 1 2-2h2M16 5h2a2 2 0 0 1 2 2v2M18 15v2a2 2 0 0 1-2 2h-2M8 19H6a2 2 0 0 1-2-2v-2" stroke-linecap="round"/><circle cx="12" cy="12" r="2.4"/></svg>
+          Registrar rostro
+        </button>
+      {% endif %}
+      <button id="btn-recognize" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 13 4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Verificar identidad
+      </button>
+    </div>
+
+    {% if not face_registered %}
+      <p class="helptext" style="text-align:center; margin-top:-0.5rem;">
+        Se piden 3 fotos en ángulos o gestos distintos (de frente, girando un
+        poco la cabeza, con otro gesto) para que el sistema aprenda a
+        reconocerte de forma confiable. Pulsa "Registrar rostro" una vez por
+        cada foto.
+      </p>
+    {% else %}
+      <p class="helptext" style="text-align:center; margin-top:-0.5rem;">
+        Por seguridad, cada cuenta solo puede registrar su rostro una vez.
+      </p>
+    {% endif %}
+
+    <div class="result-slot" id="result"></div>
+
+    <div class="tech-specs">
+      <span><strong>Detección:</strong> Haar Cascade</span>
+      <span><strong>Reconocimiento:</strong> LBPH</span>
+      <span><strong>Umbral:</strong> 60.0</span>
+      <span><strong>Canal:</strong> TLS local</span>
+    </div>
+  </div>
+
+  <!-- Overlay de confirmación de acceso (se muestra al verificar con éxito) -->
+  <div class="access-overlay" id="access-overlay">
+    <div class="access-card">
+      <div class="access-ring-wrap">
+        <div class="expand-ring"></div>
+        <div class="expand-ring delay"></div>
+        <svg class="access-check" viewBox="0 0 100 100" id="access-check-svg">
+          <circle cx="50" cy="50" r="44" id="access-check-circle" />
+          <path d="M30 52 L44 66 L72 36" id="access-check-path" />
+        </svg>
+      </div>
+      <div class="access-card-body">
+        <p class="access-card-eyebrow">Control de acceso · Verificación biométrica</p>
+        <h2>Acceso autorizado</h2>
+        <div class="access-user" id="access-user">Bienvenido/a a las instalaciones</div>
+        <div class="access-card-meta">
+          <span class="access-status-pill">AUTORIZADO</span>
+          <span class="access-meta" id="access-meta"></span>
+        </div>
+      </div>
+      <button class="btn btn-outline" id="access-continue">Continuar</button>
+    </div>
+  </div>
+
+  {% csrf_token %}
+{% endblock %}
+
+{% block extra_head %}
+  {# El "?v=" evita que el navegador se quede con una versión vieja en caché #}
+  <script src="{% static 'capture/js/camera.js' %}?v=4" defer></script>
+{% endblock %}

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}FaceAuth{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%2305070d'/%3E%3Cpath d='M6 9V7a2 2 0 0 1 2-2h2M16 5h2a2 2 0 0 1 2 2v2M18 15v2a2 2 0 0 1-2 2h-2M8 19H6a2 2 0 0 1-2-2v-2' stroke='%2322d3ee' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='12' r='2.4' fill='%2322d3ee'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  {% load static %}
+  {# El "?v=" evita que el navegador se quede con una versión vieja del CSS en caché #}
+  <link rel="stylesheet" href="{% static 'css/main.css' %}?v=2" />
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{% url 'capture:capture' %}">
+      <span class="brand-icon-wrap">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="24" height="24" rx="6" fill="url(#gradLogo)" opacity="0.2"/>
+          <path d="M6 9V7a2 2 0 0 1 2-2h2M16 5h2a2 2 0 0 1 2 2v2M18 15v2a2 2 0 0 1-2 2h-2M8 19H6a2 2 0 0 1-2-2v-2" stroke="#22d3ee" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="2.4" fill="#22d3ee"/>
+          <defs>
+            <linearGradient id="gradLogo" x1="0" y1="0" x2="24" y2="24">
+              <stop stop-color="#22d3ee"/>
+              <stop offset="1" stop-color="#e879f9"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </span>
+      <span class="brand-name">FaceAuth</span>
+    </a>
+    <nav class="site-nav">
+      {% if user.is_authenticated %}
+        <span class="nav-user">{{ user.username }}</span>
+        <a class="nav-pill" href="{% url 'accounts:logout' %}">Cerrar sesión</a>
+      {% else %}
+        <a class="nav-pill" href="{% url 'accounts:login' %}">Iniciar sesión</a>
+        <a class="nav-pill accent" href="{% url 'accounts:register' %}">Crear cuenta</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  <main class="page">
+    <div class="card{% block card_class %}{% endblock %}">
+      <span class="card-corner tl"></span>
+      <span class="card-corner tr"></span>
+      <span class="card-corner bl"></span>
+      <span class="card-corner br"></span>
+      {% if messages %}
+        <ul class="messages">
+          {% for message in messages %}
+            <li class="{{ message.tags }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    FACEAUTH · DJANGO + FASTAPI + OPENCV LBPH
+    <span class="footer-cursor">SISTEMA EN LÍNEA</span>
+  </footer>
+</body>
+</html>

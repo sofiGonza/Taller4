@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+app.db
+data/faces/*
+!data/faces/.gitkeep
+models_store/*
+!models_store/.gitkeep
+.venv/

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Crear cuenta · FaceAuth{% endblock %}
+{% block content %}
+  <p class="eyebrow">Nuevo usuario</p>
+  <h1>Crear cuenta</h1>
+  <p class="subtitle">Tu cuenta se sincroniza automáticamente con el servicio de reconocimiento facial.</p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="field-group">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        <div class="field-wrap">
+          {% if field.name == "password1" or field.name == "password2" %}
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="10.5" width="14" height="9" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" stroke-linecap="round"/></svg>
+          {% elif field.name == "email" %}
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5.5" width="16" height="13" rx="2"/><path d="M4.5 6.5 12 12.5l7.5-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {% else %}
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke-linecap="round"/></svg>
+          {% endif %}
+          {{ field }}
+        </div>
+        {% if field.help_text %}<p class="helptext">{{ field.help_text|safe }}</p>{% endif %}
+        {{ field.errors }}
+      </div>
+    {% endfor %}
+    {{ form.non_field_errors }}
+    <button type="submit" class="btn btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+      Crear cuenta
+    </button>
+  </form>
+
+  <p class="form-footer">¿Ya tienes cuenta? <a href="{% url 'accounts:login' %}">Inicia sesión</a></p>
+{% endblock %}
